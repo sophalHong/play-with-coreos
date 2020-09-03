@@ -6,15 +6,20 @@ VIRT_INS := $(shell command -v virt-install)
 VIRTD_STATE := $(shell systemctl is-active libvirtd)
 CntRt := $(shell { command -v podman || command -v docker; })
 
-CoreOS_INST_IMG ?= quay.io/coreos/coreos-installer:release
-FCCT_IMG ?= quay.io/coreos/fcct:release
-IGNITION_IMG ?= quay.io/coreos/ignition-validate:release
+CoreOS_INST_IMAGE ?= quay.io/coreos/coreos-installer:release
+FCCT_IMAGE ?= quay.io/coreos/fcct:release
+IGNITION_IMAGE ?= quay.io/coreos/ignition-validate:release
 
 NAME ?= fcos
 CPU ?= 2
 MEMORY ?= 2048#MB
 DISK ?= 10#GB
 
+YAML ?= ignition/fcct-autologin.yaml
+IGN ?= $(YAML:.yaml=.ign)
+IMAGE ?=
+
+ifdef CntRt
 CoreOS_Installer := $(CntRt) run --pull=missing           \
  				   --rm --tty --interactive             \
  				   --security-opt label=disable         \
@@ -28,17 +33,7 @@ FCCT := $(CntRt) run --rm --tty --interactive    \
 					--security-opt label=disable        \
 					--volume $${PWD}:/pwd --workdir /pwd \
 					quay.io/coreos/fcct:release
-
-check-virt: ## To check whether system has a CPU with virtualization support
-	@echo "Checking Virtualization support..."
-	@egrep '^flags.*(vmx|svm)' /proc/cpuinfo &> /dev/null && \
-		echo "[OK] Virtualization support!" || \
-		{ echo "[NOT] Your system does NOT support Virtualization."; exit 1; }
-	@echo "Verifying KVM kernel modules are properly loaded..."
-	@lsmod | grep kvm &>/dev/null && \
-		echo "[OK] KVM kernel modules are configured." || \
-		{ echo "[NOT] KVM kernel modules are NOT configured!"; exit 1; }
-	@echo
+endif
 
 prerequisite: check-virt ## Run check prerequisite
 	@echo "=== PreRequisite ==="
@@ -64,26 +59,39 @@ prerequisite: check-virt ## Run check prerequisite
 	@echo "===================="
 	@echo "[NOTE] Press CTRL + ] to escape out of the serial console."
 	@echo "===================="
+	@echo
 
-container-runtime: ## Get container runtime candidate
+check-virt: ## To check whether system has a CPU with virtualization support
+	@echo "Checking Virtualization support..."
+	@egrep '^flags.*(vmx|svm)' /proc/cpuinfo &> /dev/null && \
+		echo "[OK] Virtualization support!" || \
+		{ echo "[NOT] Your system does NOT support Virtualization."; exit 1; }
+	@echo "Verifying KVM kernel modules are properly loaded..."
+	@lsmod | grep kvm &>/dev/null && \
+		echo "[OK] KVM kernel modules are configured." || \
+		{ echo "[NOT] KVM kernel modules are NOT configured!"; exit 1; }
+	@echo
+
+check-cont-runt: ## To check which container runtime is used
 ifndef CntRt
 	$(error "[ERROR] Container Runtime (podman or docker) is NOT installed!")
 endif
+	$(info "[INFO] Container Runtime : $(CntRt)")
 
-pull-coreos-installer: container-runtime ## Pull coreor-installer image
-	@$(CntRt) image exists $(CoreOS_INST_IMG) && \
-		echo "[INFO] '$(CoreOS_INST_IMG)' already exists." || \
-		$(CntRt) pull $(CoreOS_INST_IMG)
+pull-coreos-installer: check-cont-runt ## Pull coreor-installer image
+	@$(CntRt) image exists $(CoreOS_INST_IMAGE) && \
+		echo "[INFO] '$(CoreOS_INST_IMAGE)' already exists." || \
+		$(CntRt) pull $(CoreOS_INST_IMAGE)
 
-pull-fcct: container-runtime ## Pull fcct (Fedora CoreOS Config Transpiler) image
-	@$(CntRt) image exists $(FCCT_IMG) && \
-		echo "[INFO] '$(FCCT_IMG)' already exists." || \
-		$(CntRt) pull $(FCCT_IMG)
+pull-fcct: check-cont-runt ## Pull fcct (Fedora CoreOS Config Transpiler) image
+	@$(CntRt) image exists $(FCCT_IMAGE) && \
+		echo "[INFO] '$(FCCT_IMAGE)' already exists." || \
+		$(CntRt) pull $(FCCT_IMAGE)
 
-pull-ignition: container-runtime ## Pull Ignition image
-	@$(CntRt) image exists $(IGNITION_IMG) && \
-		echo "[INFO] '$(IGNITION_IMG)' already exists." || \
-		$(CntRt) pull $(IGNITION_IMG)
+pull-ignition: check-cont-runt ## Pull Ignition image
+	@$(CntRt) image exists $(IGNITION_IMAGE) && \
+		echo "[INFO] '$(IGNITION_IMAGE)' already exists." || \
+		$(CntRt) pull $(IGNITION_IMAGE)
 
 pull-all: pull-coreos-installer pull-fcct pull-ignition ## Pull all required images
 
@@ -96,48 +104,79 @@ download-fcos-iso: pull-coreos-installer ## Download Fedora CoreOS ISO image
 download-fcos-pxe: pull-coreos-installer ## Download Fedora CoreOS PXE kernel
 	@$(CoreOS_Installer) download -f pxe
 
-fcos-qcow2-autologin: prerequisite pull-all ## Create Fedora CoreOS from qcow2 image - test autologin
-	@test -f fedora-coreos*.qcow2 || \
-		{ echo "Downloading qcow2 image..."; make download-fcos-qcow2; }
-	$(eval IMG := $(shell find $${PWD} -type f -name fedora-coreos*.qcow2 | tail -1))
-	$(eval YAML := ignition/fcct-autologin.yaml)
-	$(eval IGN := ignition/autologin.ign)
-	$(MAKE) start-vm
+fcos-qcow2-service: YAML = ignition/fcct-autologin.yaml
+fcos-qcow2-autologin: coreos ## Create Fedora CoreOS from qcow2 image - test autologin
 
-fcos-qcow2-service: prerequisite pull-all ## Create Fedora CoreOS from qcow2 image - test systemd service
-	@test -f fedora-coreos*.qcow2 || \
-		{ echo "Downloading qcow2 image..."; make download-fcos-qcow2; }
-	$(eval IMG := $(shell find $${PWD} -type f -name fedora-coreos*.qcow2 | tail -1))
-	$(eval YAML := ignition/fcct-services.yaml)
-	$(eval IGN := ignition/services.ign)
-	$(MAKE) start-vm
+fcos-qcow2-service: YAML = ignition/fcct-services.yaml
+fcos-qcow2-service: coreos ## Create Fedora CoreOS from qcow2 image - test systemd service
 
-fcos-qcow2-container: prerequisite pull-all ## Create Fedora CoreOS from qcow2 image - test create container
-	@test -f fedora-coreos*.qcow2 || \
-		{ echo "Downloading qcow2 image..."; make download-fcos-qcow2; }
-	$(eval IMG := $(shell find $${PWD} -type f -name fedora-coreos*.qcow2 | tail -1))
-	$(eval YAML := ignition/fcct-containers.yaml)
-	$(eval IGN := ignition/containers.ign)
-	$(MAKE) start-vm
+fcos-qcow2-container: YAML = ignition/fcct-containers.yaml
+fcos-qcow2-container: coreos ## Create Fedora CoreOS from qcow2 image - test create container
 
-start-vm:
+yml2ign: pull-fcct ## Convert configuation YAML file to IGN file
+ifndef YAML
+	$(info [usage]: $$ YAML=/path/to/yaml make yaml2ign)
+	$(error Please provide YAML file)
+endif
+ifndef IGN
+	$(eval IGN := $(YAML:.yaml=.ign))
+endif
 	@test -f $(YAML) || \
 		{ echo "[ERROR] $${YAML} does NOT exist!"; exit 1; }
-	@echo "Converting configuration file into an Ignition config..."
+	$(info [INFO] Converting configuration file into an Ignition config...)
 	@$(FCCT) --pretty --strict $(YAML) --output $(IGN)
-	@echo "Verifying Ignition config format is valid..."
+	$(info [INFO] Converted '$(YAML)' to '$(IGN)' successfully.)
+
+validate-ign: pull-ignition ## Verifying Ignition config format is valid
+ifndef IGN
+	$(info [usage]: $$ IGN=/path/to/ign make validate-ign)
+	$(error Please provide IGN file)
+endif
+	$(info [INFO] Verifying Ignition config format is valid...)
 	@$(Ignition_Validate) $(IGN) && \
-		echo "[Success] Ignition config is created successfully." || \
-		{ echo "[Fail] Ignition config is NOT created successfully!"; exit 1; }
-	@echo
-	@echo "Booting Fedora CoreOS..."
+		echo "[INFO] '$(IGN)' is valid and ready to use." || \
+		{ echo "[ERROR] '$(IGN)' is NOT valid!"; exit 1; }
+
+get-image:
+ifndef IMAGE
+ifeq ("$(wildcard fedora-coreos*.qcow2)", "")
+	$(info Downloading Fedora CoreOS qcow2 image (stable)...)
+	@$(MAKE) download-fcos-qcow2 --no-print-directory
+endif
+endif
+
+coreos: prerequisite yml2ign validate-ign get-image ## Create CoreOS VM
+ifndef VIRT_INS
+	$(error NOT found command '$(VIRT_INS)')
+endif
+ifndef IMAGE
+	$(eval IMAGE := $(shell find $${PWD} -type f -name fedora-coreos*.qcow2 | tail -1))
+else
+	$(eval IMAGE := $(shell realpath $${IMAGE}))
+endif
+	@test -f $(IMAGE) || { echo "[ERROR] Image '$(IMAGE)' NOT Found!"; exit 1; }
+	@test -f $(IGN) || { echo "[ERROR] Ignition '$(IGN)' NOT Found!"; exit 1; }
 	@# Setup the correct SELinux label to allow access to the config
-	chcon --verbose --type svirt_home_t $(IGN)
-	@# Start a Fedora CoreOS virtual machine
-	$(VIRT_INS) --name=$(NAME) --vcpus=$(CPU) --ram=$(MEMORY) \
-		--os-variant=$(OS)$(DIST) --disk=size=$(DISK),backing_store=$(IMG) \
+	@chcon --verbose --type svirt_home_t $(IGN) &> /dev/null
+	$(info ============VM INFO============)
+	$(info NAME     : $(NAME))
+	$(info CPU      : $(CPU))
+	$(info MEMORY   : $(MEMORY)MB)
+	$(info DISK     : $(DISK)GB)
+	$(info NETWORK  : bridge=virbr0)
+	$(info GRAPHICS : none)
+	$(info IMAGE    : $(IMAGE))
+	$(info IGNITION : $(IGN))
+	$(info ===============================)
+	@$(VIRT_INS) --name=$(NAME) --vcpus=$(CPU) --ram=$(MEMORY) \
+		--os-variant=$(OS)$(DIST) --disk=size=$(DISK),backing_store=$(IMAGE) \
 		--import --network=bridge=virbr0 --graphics=none \
 		--qemu-commandline="-fw_cfg name=opt/com.coreos/config,file=$${PWD}/$(IGN)"
+
+list: ## List of Virtual Machines created by virsh-install
+	@virsh list
+
+status: list ## Status of Virtual Machines created by virsh-install
 
 destroy: ## Destroy VM 
 	@virsh destroy $(NAME) || \
@@ -151,8 +190,8 @@ destroy: ## Destroy VM
 		
 	@virsh undefine --remove-all-storage $(NAME)
 
-list: ## List of Virtual Machines created by virsh-install
-	@virsh list
+clean: ## Remove Ignition files
+	rm ignition/*.ign
 
 tmp:
 ifneq ($(VIRTD_STATE),active)
@@ -189,10 +228,13 @@ help: ## Show this help menu.
 .DEFAULT_GOAL := help
 .EXPORT_ALL_VARIABLES:
 .PHONY: help \
-	check-virt container-runtime \
+	check-cont-runt check-virt clean coreos\
 	destroy \
 	download-fcos-iso download-fcos-pxe download-qcow2 \
 	fcos-qcow2-autologin fcos-qcow2-container fcos-qcow2-service \
 	list \
 	prerequisites \
-	pull-all pull-coreos-installer pull-fcct pull-ignition
+	pull-all pull-coreos-installer pull-fcct pull-ignition \
+	status \
+	validate-ign \
+	yml2ign

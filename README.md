@@ -13,6 +13,7 @@ A demo of the start and destroy of a CoreOS VM can be found here: [README.md Dem
 - [Troubleshooting](#Troubleshooting)
 - [Demo](#demo)
   - [Start FCOS qcow2 VM](#start-fcos-qcow2-vm)
+  - [Running etcd container](#running-etcd-container)
   - [Destroy VM](#destroy-vm)
 - [Creating an Issue](#creating-an-issue)
 
@@ -42,22 +43,13 @@ If this command lists kvm_intel or kvm_amd, KVM is properly configured.
 
 ## Quickstart
 To start with the defaults, run the following:
-  - Fedora CoreOS (qcow2) - Enable auto login
-	```shell
-	$ make fcos-qcow2-autologin
-	```
-  - Fedora CoreOS (qcow2) - Execute systemd service
-	```shell
-	$ make fcos-qcow2-service
-	```
-  - Fedora CoreOS (qcow2) - Create and Run container
-	```shell
-	$ fcos-qcow2-container
-	```
-
-Modify VM variables:
 ```shell
-$ NAME=vm-1 CPU=4 MEMORY=4096 DISK=2 make fcos-qcow2-container
+$ make coreos
+```
+
+To start with customized variables:
+```shell
+$ NAME=vm-1 CPU=4 MEMORY=4096 DISK=2 IMAGE=/path/to/imgage YAML=/path/to/ignition.yaml make coreos
 ```
 
 To Destroy:
@@ -67,11 +59,13 @@ $ make destroy
 
 ## Usage
 Run `make help` to see available commands.
-```shell\
+```shell
 Usage: make [TARGET ...]
 
+check-cont-runt                To check which container runtime is used
 check-virt                     To check whether system has a CPU with virtualization support
-container-runtime              Get container runtime candidate
+clean                          Remove Ignition files
+coreos                         Create CoreOS VM
 destroy                        Destroy VM
 download-fcos-iso              Download Fedora CoreOS ISO image
 download-fcos-pxe              Download Fedora CoreOS PXE kernel
@@ -86,6 +80,9 @@ pull-all                       Pull all required images
 pull-coreos-installer          Pull coreor-installer image
 pull-fcct                      Pull fcct (Fedora CoreOS Config Transpiler) image
 pull-ignition                  Pull Ignition image
+status                         Status of Virtual Machines created by virsh-install
+validate-ign                   Verifying Ignition config format is valid
+yml2ign                        Convert configuation YAML file to IGN file
 ```
 [Note] To escape out of the serial console, press `CTRL + ]`
 
@@ -97,6 +94,9 @@ This is caused by the virtualization technology is being locked by another hyper
 ## Demo
 
 ### Start FCOS qcow2 VM
+[![asciicast](https://asciinema.org/a/ix5vxtBvhWi69HiDnEotB5Jpe.svg)](https://asciinema.org/a/ix5vxtBvhWi69HiDnEotB5Jpe)
+
+### Running etcd container
 [![asciicast](https://asciinema.org/a/I1bnSGUsReq74etuCqvlnD2cz.svg)](https://asciinema.org/a/I1bnSGUsReq74etuCqvlnD2cz)
 
 ### Destroy VM
