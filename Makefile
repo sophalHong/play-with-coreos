@@ -6,9 +6,13 @@ VIRT_INS := $(shell command -v virt-install)
 VIRTD_STATE := $(shell systemctl is-active libvirtd)
 CntRt := $(shell { command -v podman || command -v docker; })
 
+COSA_DIR ?= $(shell pwd)/fcos
+CONFIG_REPO ?= https://github.com/coreos/fedora-coreos-config
+
 CoreOS_INST_IMAGE ?= quay.io/coreos/coreos-installer:release
 FCCT_IMAGE ?= quay.io/coreos/fcct:release
 IGNITION_IMAGE ?= quay.io/coreos/ignition-validate:release
+COSA_IMAGE ?= quay.io/coreos-assembler/coreos-assembler:latest
 
 NAME ?= fcos
 CPU ?= 2
@@ -33,6 +37,13 @@ FCCT := $(CntRt) run --rm --tty --interactive    \
 					--security-opt label=disable        \
 					--volume $${PWD}:/pwd --workdir /pwd \
 					quay.io/coreos/fcct:release
+COSA := $(CntRt) run --rm -ti --security-opt label=disable --privileged \
+		--uidmap=1000:0:1 --uidmap=0:1:1000 --uidmap 1001:1001:64536    \
+		-v $(COSA_DIR):/srv/ --device /dev/kvm --device /dev/fuse  		\
+		--tmpfs /tmp -v /var/tmp:/var/tmp --name cosa     				\
+		--env COREOS_ASSEMBLER_CONFIG_GIT:/srv/src/config/				\
+		--env COREOS_ASSEMBLER_GIT/src/:/usr/lib/coreos-assembler/		\
+		$(COSA_IMAGE)
 endif
 
 prerequisite: check-virt ## Run check prerequisite
@@ -77,6 +88,11 @@ ifndef CntRt
 	$(error "[ERROR] Container Runtime (podman or docker) is NOT installed!")
 endif
 	$(info "[INFO] Container Runtime : $(CntRt)")
+
+pull-cosa: check-cont-runt ## Pull coreos-assembler image
+	@$(CntRt) image exists $(COSA_IMAGE) && \
+		echo "[INFO] '$(COSA_IMAGE)' already exists." || \
+		$(CntRt) pull $(COSA_IMAGE)
 
 pull-coreos-installer: check-cont-runt ## Pull coreor-installer image
 	@$(CntRt) image exists $(CoreOS_INST_IMAGE) && \
@@ -192,6 +208,24 @@ destroy: ## Destroy VM
 
 clean: ## Remove Ignition files
 	rm ignition/*.ign
+
+cosa-init: pull-cosa ## CoreOS Assembler - Initialize configuration repo
+	@if ! [ -d $(COSA_DIR) ]; then \
+		mkdir -p $(COSA_DIR); \
+		$(COSA) init $(CONFIG_REPO); \
+	fi
+
+cosa-fetch: ## CoreOS Assembler - Fetch metadata and packages
+	@$(COSA) fetch
+
+cosa-build: cosa-init cosa-fetch  ## CoreOS Assembler - Build coreos
+	@$(COSA) build
+
+cosa-run: ## CoreOS Assembler - Run built coreos
+	@$(COSA) run
+
+cosa-clean: ## CoreOS Assembler - Clean coreos confiuration directory
+	sudo rm -rf $(COSA_DIR)
 
 tmp:
 ifneq ($(VIRTD_STATE),active)

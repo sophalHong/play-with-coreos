@@ -9,13 +9,15 @@ A demo of the start and destroy of a CoreOS VM can be found here: [README.md Dem
 - [Prerequisites](#prerequisites)
 - [Hardware Requirements](#hardware-requirements)
 - [Quickstart](#quickstart)
+  - [Run CoreOS with ignition](#run-coreos-with-ignition)
+  - [CoreOS Assembler](#coreos-assembler)
 - [Usage](#usage)
 - [Troubleshooting](#Troubleshooting)
 - [Demo](#demo)
+  - [CoreOS Assembler Build FCOS](#coreos-assembler-build-fcos)
   - [Start FCOS qcow2 VM](#start-fcos-qcow2-vm)
   - [Running etcd container](#running-etcd-container)
   - [Destroy VM](#destroy-vm)
-- [Creating an Issue](#creating-an-issue)
 
 <!-- /TOC -->
 
@@ -42,19 +44,37 @@ $ lsmod | grep kvm
 If this command lists kvm_intel or kvm_amd, KVM is properly configured.
 
 ## Quickstart
+
+### Run CoreOS with ignition
 To start with the defaults, run the following:
 ```shell
-$ make coreos
+$ make run
 ```
 
 To start with customized variables:
 ```shell
-$ NAME=vm-1 CPU=4 MEMORY=4096 DISK=2 IMAGE=/path/to/imgage YAML=/path/to/ignition.yaml make coreos
+$ NAME=vm-1 CPU=4 MEMORY=4096 DISK=2 IMAGE=/path/to/imgage YAML=/path/to/ignition.yaml make run
 ```
 
 To Destroy:
 ```shell
 $ make destroy
+```
+
+### CoreOS Assembler
+To build coreOS with defaults (https://github.com/coreos/fedora-coreos-config)
+```shell
+$ make cosa-build
+```
+
+To build custom coreOS
+```shell
+$ COSA_DIR=/path/to/working-dir CONFIG_REPO=<url> make cosa-build
+```
+
+To Clean up COSA working directory
+```shell
+$ make cosa-clean
 ```
 
 ## Usage
@@ -65,6 +85,11 @@ Usage: make [TARGET ...]
 check-cont-runt                To check which container runtime is used
 check-virt                     To check whether system has a CPU with virtualization support
 clean                          Remove Ignition files
+cosa-build                     CoreOS Assembler - Build coreos
+cosa-clean                     CoreOS Assembler - Clean coreos confiuration directory
+cosa-fetch                     CoreOS Assembler - Fetch metadata and packages
+cosa-init                      CoreOS Assembler - Initialize configuration repo
+cosa-run                       CoreOS Assembler - Run built coreos
 destroy                        Destroy VM
 download-fcos-iso              Download Fedora CoreOS ISO image
 download-fcos-pxe              Download Fedora CoreOS PXE kernel
@@ -77,6 +102,7 @@ list                           List of Virtual Machines created by virsh-install
 prerequisite                   Run check prerequisite
 pull-all                       Pull all required images
 pull-coreos-installer          Pull coreor-installer image
+pull-cosa                      Pull coreos-assembler image
 pull-fcct                      Pull fcct (Fedora CoreOS Config Transpiler) image
 pull-ignition                  Pull Ignition image
 run                            Create and Run CoreOS VM
@@ -93,6 +119,9 @@ This is caused by the virtualization technology is being locked by another hyper
 
 ## Demo
 
+### CoreOS Assembler Build FCOS
+[![asciicast](https://asciinema.org/a/280iS84dNs2kYwRufxzClRfvw.svg)](https://asciinema.org/a/280iS84dNs2kYwRufxzClRfvw)
+
 ### Start FCOS qcow2 VM
 [![asciicast](https://asciinema.org/a/ix5vxtBvhWi69HiDnEotB5Jpe.svg)](https://asciinema.org/a/ix5vxtBvhWi69HiDnEotB5Jpe)
 
@@ -101,3 +130,4 @@ This is caused by the virtualization technology is being locked by another hyper
 
 ### Destroy VM
 [![asciicast](https://asciinema.org/a/ZDdNgLKdPc2m4oO1RKHeVyQ6K.svg)](https://asciinema.org/a/ZDdNgLKdPc2m4oO1RKHeVyQ6K)
+
