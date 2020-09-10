@@ -1,0 +1,44 @@
+variant: fcos
+version: 1.0.0
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        # Change here - use your own ssh public key
+        - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCumO1uJGg+4pkhZ+a8+nDMmjECJf0PBww0I82hbxw40pCnDQ84yThZYQiGv82fs10kuJRm+NpDbRyAmZfAng+z07aa1lHHxpgjk9xzN9K9NWHFssQ4LfLqhPF330NwT9ryNyT4UC3p022gRBC/sf71/92Yih+1gdkZhfsay3KDG4NAiMnNj5GokXxOh6eub6aWY4EygOJbcnH8+gZFLEepq9vgWh3ms2iadB59h0GQBVoaqoMAIlKc/5ttb1nnPz3xpCNd67I7ljkvkWOYazgRFOQs96siiTL5YJ42OhA2wj8ZN5V2iFAfci034YTI/YciHMc0GBAo9V8sIhiAi+tMWWbbBDT3Xg+XvFG/8Nd0Q+saWIcKsQSynA/yYwFvfz6SB/m7GfHjjUPdNfdHwnSSi0Qt6j+1M36PNL0XwcMlWAtEGVNhCSEOByWNTEVorW8zAi6XqhsKw3kV0LfjnkYhoBRy9RYWDrKl2jfC68Izu2tg47TzzotLnXYg7jj6XzU= sophal@centos8.ck.tmax
+    - name: sophal
+      password_hash: "$2y$10$JfaKKIP3bzB7Yq.7Qndavu2PIheA9tSmzSMbRzLAngGB5RQTMbb8i" # pw: sophal123
+      groups:
+      - wheel
+storage:
+  disks:
+  - device: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_hd1
+    wipe_table: true
+    partitions:
+    - label: "disk.storage"
+      number: 0
+      wipe_partition_entry: true
+  filesystems:
+  - path: /var/storage
+    device: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_hd1
+    wipe_filesystem: true
+    format: ext4
+    label: STORAGE
+  files:
+  - path: /etc/hostname
+    overwrite: true
+    mode: 0644
+    contents:
+      inline: fcos-server-test
+systemd:
+  units:
+  - name: var-storage.mount
+    enabled: true
+    contents: |
+      [Mount]
+      What=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_hd1
+      Where=/var/storage
+      Type=ext4
+
+      [Install]
+      WantedBy=local-fs.target
