@@ -145,7 +145,7 @@ ifeq ("$(wildcard fedora-coreos*.qcow2)", "")
 endif
 endif
 
-coreos: prerequisite yml2ign validate-ign get-image ## Create CoreOS VM
+run: prerequisite yml2ign validate-ign get-image ## Create and Run CoreOS VM
 ifndef VIRT_INS
 	$(error NOT found command '$(VIRT_INS)')
 endif

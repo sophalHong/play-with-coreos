@@ -65,7 +65,6 @@ Usage: make [TARGET ...]
 check-cont-runt                To check which container runtime is used
 check-virt                     To check whether system has a CPU with virtualization support
 clean                          Remove Ignition files
-coreos                         Create CoreOS VM
 destroy                        Destroy VM
 download-fcos-iso              Download Fedora CoreOS ISO image
 download-fcos-pxe              Download Fedora CoreOS PXE kernel
@@ -80,6 +79,7 @@ pull-all                       Pull all required images
 pull-coreos-installer          Pull coreor-installer image
 pull-fcct                      Pull fcct (Fedora CoreOS Config Transpiler) image
 pull-ignition                  Pull Ignition image
+run                            Create and Run CoreOS VM
 status                         Status of Virtual Machines created by virsh-install
 validate-ign                   Verifying Ignition config format is valid
 yml2ign                        Convert configuation YAML file to IGN file
